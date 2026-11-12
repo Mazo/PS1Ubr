@@ -8,11 +8,18 @@ namespace AmenityExtractor
     public static class GUIDAssigner
     {
         /*
-         GUIDs are assigned in a very specific order, and certain objects have priority over others, for example structures are assigned GUIDs first
+         GUIDs are assigned the way the game client does it (verified against debugger dumps of the client for map04, map05, map13 and ugd04: every object gets the same GUID):
 
-         Some objects such as aircraft landing pads or repair silos have multiple GUIDs assigned. This is likely one GUID per function (e.g. one GUID for the rearm, one or more for repair / AT recharge. Exact details are unknown currently)
+         1. All map objects go into ONE list in creation order (our Id order). The client then sorts that list with an STLport stable_sort (see ClientStableSort).
+         2. The comparator (ClientObjectLess) puts objects that have a map id (structures and groundcover roots, i.e. !IsChildObject) before everything else, then compares the type name
+            case-insensitively (_stricmp), then X and Y, which only count when they differ by at least 0.1 (otherwise the next axis decides), then Z.
+            The tolerance makes the comparator inconsistent for near ties, so the exact stable_sort algorithm matters, not just the key.
+         3. GUIDs are handed out one by one in that order. Some objects reserve extra GUIDs for sub-objects (see objectTypesWithMultipleGuids).
+         4. The coordinates compared are the ones the client computes: the parent rotation is the exact 14-bit angle (not rounded to degrees) and .lst coordinates are parsed by truncating toward
+            zero (ClientFloat). They are kept in SortX/SortY/SortZ; the exported AbsX/AbsY/AbsZ are unchanged.
 
-         GUIDs are typically assigned in the order of Object Type -> X Position -> Y Position -> Z Position
+         Some objects such as aircraft landing pads or repair silos have multiple GUIDs assigned: one per sub-terminal (rearm, vehicle recharge, BFR rearm), allocated from the same pool.
+         Objects the client creates but we do not export (unused LLU sockets) still consume a GUID, which shows up as a gap.
         */
 
         public static void AssignGUIDs(List<PlanetSideObject> mapObjects)
@@ -31,18 +38,14 @@ namespace AmenityExtractor
             var objectNamesWithMultipleGuids = new Dictionary<string, int>();
 
 
-            // For some unknown reason Cyssor is the only map with a gap between the monolith object (GUID 59 clientside) and the first tech_plant (Wele - GUID 66 clientside) object.
-            // So far efforts to determine why have proved fruitless, so the below is a workaround to skip 6 GUIDs ahead after the monolith.
+            // Cyssor has a gap between the monolith object (GUID 59 clientside) and the first tech_plant (Wele - GUID 66 clientside) object that is not explained yet (map03 has not been captured from the client).
+            // Until it is, the workaround below skips 6 GUIDs ahead after the monolith.
             objectNamesWithMultipleGuids.Add("monolith_cyssor", 6);
 
-            //Repair silos in sanctuaries aren't assigned to a building and are added in the groundcover file. Currently this will break the GUID assignments as a repair_silo is suddenly a structure in it's own right
-            // For now, skip them by jumping ahead after the last HART building in each Sanctuary.
-            //objectNamesWithMultipleGuids.Add("Esamir_HART", 24); // VS - 6 repair silos
-            //objectNamesWithMultipleGuids.Add("Hart_Forseral", 48); // TR - 12 repair silos
-            //objectNamesWithMultipleGuids.Add("Hart_Hossin", 24); // NC - 6 repair silos
+            // Repair silos in sanctuaries are groundcover roots (not part of a building) and are numbered in sort order like any other root; no special skip is needed
+            // (confirmed on the VS sanctuary, map13).
 
-            // The client sorts every map object in one vector (STLport stable_sort over the objects in creation order): structures first (objects with a map id), then everything else, each group ordered by
-            // name (case-insensitive), then X and Y with a 0.1 tolerance, then Z. GUIDs are handed out in that order. See ClientStableSort and ClientObjectLess.
+            // Sort like the client (see the comment at the top of this class), then hand out GUIDs in that order.
             var orderedObjects = ClientStableSort.Sort(mapObjects.OrderBy(x => x.Id).ToList(), ClientObjectLess);
 
             foreach (var obj in orderedObjects)
