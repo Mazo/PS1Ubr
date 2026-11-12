@@ -22,6 +22,10 @@ namespace AmenityExtractor
         private static ConcurrentDictionary<string, CUberData> _ubrData = new ConcurrentDictionary<string, CUberData>();
         private static GameObjectsReader objReader = new GameObjectsReader(_planetsideModReadyFolder);
 
+        // Per-placement height adjustments from the client's addendum.lst, keyed by (map name, map object id)
+        private static Dictionary<(string map, int id), float> _nudges = AddendumReader.ReadNudges(_planetsideModReadyFolder);
+        private static string _currentMap;
+
         static void Main(string[] args)
         {
             var maps = new List<(string name, string mapNumber, bool isCave)> {
@@ -60,6 +64,7 @@ namespace AmenityExtractor
 
                 var (mapName, mapNumber, isCave) = map;
                 Console.WriteLine($"Processing map {mapNumber} - {mapName}");
+                _currentMap = "map" + mapNumber;
 
                 int id = 0;
 
@@ -69,7 +74,7 @@ namespace AmenityExtractor
                     var mpoData = MPOReader.ReadMPOFile(_planetsideModReadyFolder, mapNumber);
                     foreach (var entry in mpoData)
                     {
-                        ProcessObject(identifiableObjects, entry, ref id, mapId: mpoData.IndexOf(entry) + 1, isTopLevel: true);
+                        ProcessObject(identifiableObjects, entry, ref id, mapId: mpoData.IndexOf(entry) + 1, isTopLevel: true, isMpoRecord: true);
                     }
                 }
 
@@ -99,6 +104,15 @@ namespace AmenityExtractor
                         identifiableObjects[i].SortX += 1024;
                         identifiableObjects[i].SortY += 1024;
                     }
+                }
+
+                // Export the positions the way the client computes them (exact placement rotation, truncated .lst coordinates, client height adjustments).
+                // The same values are used for ordering in GUIDAssigner, so output and GUID order always agree.
+                foreach (var obj in identifiableObjects)
+                {
+                    obj.AbsX = (float)obj.SortX;
+                    obj.AbsY = (float)obj.SortY;
+                    obj.AbsZ = (float)obj.SortZ;
                 }
 
                 // bfr_building doesn't actually have a GUID itself - the door does which is a sub-object in the ubr file.
@@ -152,7 +166,7 @@ namespace AmenityExtractor
             };
         }
 
-        private static void ProcessObject(List<PlanetSideObject> identifiableObjects, MapObject entry, ref int id, int? mapId, bool isTopLevel = false)
+        private static void ProcessObject(List<PlanetSideObject> identifiableObjects, MapObject entry, ref int id, int? mapId, bool isTopLevel = false, bool isMpoRecord = false)
         {
             if (!_objectsWithGuids.Contains(entry.ObjectType)) return;
             Console.WriteLine($"Processing {entry.ObjectType}");
@@ -169,6 +183,20 @@ namespace AmenityExtractor
             var exactRotationDegrees = MathFunctions.PS1RotationToExactDegrees(entry.HorizontalRotation);
             var exactRotationRadians = MathFunctions.DegreesToRadians(exactRotationDegrees);
 
+            // Height of the placement as the client computes it. Placements read from the .mpo file (not groundcover, not caves) are raised: +0.2, +0.4 for names starting with "mainbase_",
+            // plus the placement's nudge from addendum.lst; warpgates get no lift but still the nudge. (Client map loader, state 6.)
+            var rootHeight = entry.HeightPosition;
+            if (isMpoRecord)
+            {
+                if (!string.Equals(entry.ObjectType, "warpgate", StringComparison.OrdinalIgnoreCase))
+                {
+                    rootHeight += entry.ObjectType.StartsWith("mainbase_", StringComparison.Ordinal) ? 0.4f : 0.2f;
+                }
+
+                // The nudge applies to every .mpo placement, warpgates included
+                if (mapId.HasValue && _nudges.TryGetValue((_currentMap, mapId.Value), out var nudge)) rootHeight += nudge;
+            }
+
             var entryObject = new PlanetSideObject
             {
                 Id = id,
@@ -176,13 +204,13 @@ namespace AmenityExtractor
                 ObjectType = entry.ObjectType,
                 AbsX = entry.HorizontalPosition,
                 AbsY = entry.VerticalPosition,
-                AbsZ = entry.HeightPosition,
+                AbsZ = rootHeight,
                 YawDegrees = objectRotationDegrees,
                 MapID = mapId,
                 IsChildObject = !isTopLevel,
                 SortX = entry.HorizontalPosition,
                 SortY = entry.VerticalPosition,
-                SortZ = entry.HeightPosition,
+                SortZ = rootHeight,
                 ExactYawDegrees = exactRotationDegrees
             };
             identifiableObjects.Add(entryObject);
@@ -219,17 +247,17 @@ namespace AmenityExtractor
                     Owner = entryObject.Id,
                     AbsX = entry.HorizontalPosition + rotX,
                     AbsY = entry.VerticalPosition + rotY,
-                    AbsZ = entry.HeightPosition + meshItem.Transform[14],
+                    AbsZ = rootHeight + meshItem.Transform[14],
                     SortX = entry.HorizontalPosition + exactRotX,
                     SortY = entry.VerticalPosition + exactRotY,
-                    SortZ = entry.HeightPosition + meshItem.Transform[14],
+                    SortZ = rootHeight + meshItem.Transform[14],
                     YawDegrees = MathFunctions.NormalizeDegrees((int)yaw),
                     IsChildObject = true
                 });
                 id++;
             }
 
-            ProcessLSTPeEdits(peEdits, identifiableObjects, objectRotationRadians, exactRotationRadians, baseX: entry.HorizontalPosition, baseY: entry.VerticalPosition, baseZ: entry.HeightPosition, ownerId: entryObject.Id, id: ref id);
+            ProcessLSTPeEdits(peEdits, identifiableObjects, objectRotationRadians, exactRotationRadians, baseX: entry.HorizontalPosition, baseY: entry.VerticalPosition, baseZ: rootHeight, ownerId: entryObject.Id, id: ref id);
 
             ProcessLSTPseRelativeObjects(pseRelativeObjects, identifiableObjects, ownerObject: entryObject, id: ref id);
         }
@@ -273,7 +301,7 @@ namespace AmenityExtractor
                 var mesh = UBRReader.GetMeshSystem(line.ObjectName, uber.Value);
 
                 var (relativeObjectRotX, relativeObjectRotY) = MathFunctions.RotateXY(line.RelX, line.RelY, MathFunctions.DegreesToRadians(ownerObject.YawDegrees));
-                (float x, float y, float z) relativeObjectPos = (relativeObjectRotX + ownerObject.AbsX, relativeObjectRotY + ownerObject.AbsY, line.RelZ + ownerObject.AbsZ);
+                (float x, float y, float z) relativeObjectPos = (relativeObjectRotX + ownerObject.AbsX, relativeObjectRotY + ownerObject.AbsY, (float)(line.RelZ + ownerObject.SortZ));
 
                 var relativeObjectRotationDegrees = MathFunctions.PS1RotationToDegrees((int)line.Yaw);
                 var exactRelativeObjectRotationDegrees = MathFunctions.PS1RotationToExactDegrees((int)line.Yaw);
@@ -296,10 +324,10 @@ namespace AmenityExtractor
                         Owner = ownerObject.Id,
                         AbsX = relativeObjectPos.x + subObjectRotX,
                         AbsY = relativeObjectPos.y + subObjectRotY,
-                        AbsZ = relativeObjectPos.z + line.RelZ,
+                        AbsZ = relativeObjectPos.z + meshItem.Transform[14],
                         SortX = ownerObject.SortX + exactRelRotX + exactSubRotX,
                         SortY = ownerObject.SortY + exactRelRotY + exactSubRotY,
-                        SortZ = relativeObjectPos.z + line.RelZ,
+                        SortZ = relativeObjectPos.z + meshItem.Transform[14],
                         IsChildObject = true
                     });
                     id++;
