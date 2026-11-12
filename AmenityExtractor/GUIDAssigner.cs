@@ -83,9 +83,9 @@ namespace AmenityExtractor
         {
             var c = CompareNamesIgnoreCase(a.ObjectType.Replace("!", ""), b.ObjectType.Replace("!", ""));
             if (c != 0) return c < 0;
-            if (Math.Abs(a.AbsX - b.AbsX) >= ClientCoordinateTolerance) return a.AbsX < b.AbsX;
-            if (Math.Abs(a.AbsY - b.AbsY) >= ClientCoordinateTolerance) return a.AbsY < b.AbsY;
-            return a.AbsZ < b.AbsZ;
+            if (Math.Abs((float)a.SortX - (float)b.SortX) >= ClientCoordinateTolerance) return (float)a.SortX < (float)b.SortX;
+            if (Math.Abs((float)a.SortY - (float)b.SortY) >= ClientCoordinateTolerance) return (float)a.SortY < (float)b.SortY;
+            return (float)a.SortZ < (float)b.SortZ;
         }
 
         private static int CompareNamesIgnoreCase(string a, string b)

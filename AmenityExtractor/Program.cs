@@ -96,6 +96,8 @@ namespace AmenityExtractor
                     {
                         identifiableObjects[i].AbsX += 1024;
                         identifiableObjects[i].AbsY += 1024;
+                        identifiableObjects[i].SortX += 1024;
+                        identifiableObjects[i].SortY += 1024;
                     }
                 }
 
@@ -161,6 +163,8 @@ namespace AmenityExtractor
 
             var objectRotationDegrees = MathFunctions.PS1RotationToDegrees(entry.HorizontalRotation);
             var objectRotationRadians = MathFunctions.DegreesToRadians(objectRotationDegrees);
+            var exactRotationDegrees = MathFunctions.PS1RotationToExactDegrees(entry.HorizontalRotation);
+            var exactRotationRadians = MathFunctions.DegreesToRadians(exactRotationDegrees);
 
             var entryObject = new PlanetSideObject
             {
@@ -172,7 +176,11 @@ namespace AmenityExtractor
                 AbsZ = entry.HeightPosition,
                 YawDegrees = objectRotationDegrees,
                 MapID = mapId,
-                IsChildObject = !isTopLevel
+                IsChildObject = !isTopLevel,
+                SortX = entry.HorizontalPosition,
+                SortY = entry.VerticalPosition,
+                SortZ = entry.HeightPosition,
+                ExactYawDegrees = exactRotationDegrees
             };
             identifiableObjects.Add(entryObject);
             id++;
@@ -194,6 +202,7 @@ namespace AmenityExtractor
 
                 var (rotX, rotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13],
                     objectRotationRadians);
+                var (exactRotX, exactRotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13], exactRotationRadians);
                 var meshItemYaw = MathFunctions.TransformToRotationDegrees(meshItem.Transform);
 
                 // Convert from CCW to CW and apply 180 degree offset
@@ -208,24 +217,28 @@ namespace AmenityExtractor
                     AbsX = entry.HorizontalPosition + rotX,
                     AbsY = entry.VerticalPosition + rotY,
                     AbsZ = entry.HeightPosition + meshItem.Transform[14],
+                    SortX = entry.HorizontalPosition + exactRotX,
+                    SortY = entry.VerticalPosition + exactRotY,
+                    SortZ = entry.HeightPosition + meshItem.Transform[14],
                     YawDegrees = MathFunctions.NormalizeDegrees((int)yaw),
                     IsChildObject = true
                 });
                 id++;
             }
 
-            ProcessLSTPeEdits(peEdits, identifiableObjects, objectRotationRadians, baseX: entry.HorizontalPosition, baseY: entry.VerticalPosition, baseZ: entry.HeightPosition, ownerId: entryObject.Id, id: ref id);
+            ProcessLSTPeEdits(peEdits, identifiableObjects, objectRotationRadians, exactRotationRadians, baseX: entry.HorizontalPosition, baseY: entry.VerticalPosition, baseZ: entry.HeightPosition, ownerId: entryObject.Id, id: ref id);
 
             ProcessLSTPseRelativeObjects(pseRelativeObjects, identifiableObjects, ownerObject: entryObject, id: ref id);
         }
 
-        private static void ProcessLSTPeEdits(List<Pe_Edit> peEdits, List<PlanetSideObject> identifiableObjects, double baseRotationRadians, float baseX, float baseY, float baseZ, int ownerId, ref int id)
+        private static void ProcessLSTPeEdits(List<Pe_Edit> peEdits, List<PlanetSideObject> identifiableObjects, double baseRotationRadians, double exactRotationRadians, float baseX, float baseY, float baseZ, int ownerId, ref int id)
         {
             foreach (var peEdit in peEdits)
             {
                 if (!_objectsWithGuids.Contains(peEdit.ObjectType, StringComparer.OrdinalIgnoreCase)) continue;
 
                 var (rotX, rotY) = MathFunctions.RotateXY(peEdit.RelX, peEdit.RelY, baseRotationRadians);
+                var (exactRotX, exactRotY) = MathFunctions.RotateXY(peEdit.RelX, peEdit.RelY, exactRotationRadians);
 
                 identifiableObjects.Add(new PlanetSideObject
                 {
@@ -236,6 +249,9 @@ namespace AmenityExtractor
                     AbsX = baseX + rotX,
                     AbsY = baseY + rotY,
                     AbsZ = baseZ + peEdit.RelZ,
+                    SortX = baseX + exactRotX,
+                    SortY = baseY + exactRotY,
+                    SortZ = baseZ + peEdit.RelZ,
                     IsChildObject = true
                 });
                 id++;
@@ -257,6 +273,8 @@ namespace AmenityExtractor
                 (float x, float y, float z) relativeObjectPos = (relativeObjectRotX + ownerObject.AbsX, relativeObjectRotY + ownerObject.AbsY, line.RelZ + ownerObject.AbsZ);
 
                 var relativeObjectRotationDegrees = MathFunctions.PS1RotationToDegrees((int)line.Yaw);
+                var exactRelativeObjectRotationDegrees = MathFunctions.PS1RotationToExactDegrees((int)line.Yaw);
+                var (exactRelRotX, exactRelRotY) = MathFunctions.RotateXY(line.RelX, line.RelY, MathFunctions.DegreesToRadians(ownerObject.ExactYawDegrees));
 
                 // Process any sub-objects in the ubr file for this relative object (e.g. bfr_door within bfr_building ubr)
                 foreach (var meshItem in mesh.PortalSystem.MeshItems)
@@ -265,6 +283,7 @@ namespace AmenityExtractor
 
                     var subObjectRotationDegrees = MathFunctions.TransformToRotationDegrees(meshItem.Transform);
 
+                    var (exactSubRotX, exactSubRotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13], MathFunctions.DegreesToRadians(ownerObject.ExactYawDegrees + exactRelativeObjectRotationDegrees));
                     var (subObjectRotX, subObjectRotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13], MathFunctions.DegreesToRadians(ownerObject.YawDegrees + relativeObjectRotationDegrees));
                     identifiableObjects.Add(new PlanetSideObject
                     {
@@ -275,6 +294,9 @@ namespace AmenityExtractor
                         AbsX = relativeObjectPos.x + subObjectRotX,
                         AbsY = relativeObjectPos.y + subObjectRotY,
                         AbsZ = relativeObjectPos.z + line.RelZ,
+                        SortX = ownerObject.SortX + exactRelRotX + exactSubRotX,
+                        SortY = ownerObject.SortY + exactRelRotY + exactSubRotY,
+                        SortZ = relativeObjectPos.z + line.RelZ,
                         IsChildObject = true
                     });
                     id++;

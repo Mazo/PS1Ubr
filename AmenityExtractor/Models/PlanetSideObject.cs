@@ -13,6 +13,12 @@ namespace AmenityExtractor.Models
         public float AbsY { get; set; }
         public float AbsZ { get; set; }
 
+        // Position and rotation as the client computes them (exact 14-bit parent rotation). Used only for ordering during GUID assignment, not exported.
+        [JsonIgnore] public double SortX { get; set; }
+        [JsonIgnore] public double SortY { get; set; }
+        [JsonIgnore] public double SortZ { get; set; }
+        [JsonIgnore] public double ExactYawDegrees { get; set; }
+
         [JsonProperty("Yaw")]
         public double YawDegrees { get; set; }
 
