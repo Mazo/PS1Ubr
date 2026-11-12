@@ -16,9 +16,9 @@ namespace AmenityExtractor
             The tolerance makes the comparator inconsistent for near ties, so the exact stable_sort algorithm matters, not just the key.
          3. GUIDs are handed out one by one in that order. Some objects reserve extra GUIDs for sub-objects (see objectTypesWithMultipleGuids).
          4. The coordinates compared are the ones the client computes: the parent rotation is the exact 14-bit angle (not rounded to degrees) and .lst coordinates are parsed by truncating toward
-            zero (ClientFloat). They are kept in SortX/SortY/SortZ; the exported AbsX/AbsY/AbsZ are unchanged.
+            zero (ClientFloat). They are kept in SortX/SortY/SortZ and exported as AbsX/AbsY/AbsZ, so output and GUID order always agree.
 
-         Some objects such as aircraft landing pads or repair silos have multiple GUIDs assigned: one per sub-terminal (rearm, vehicle recharge, BFR rearm), allocated from the same pool.
+         Extra GUIDs reserved after some objects: see objectTypesWithMultipleGuids below.
          Objects the client creates but we do not export (unused LLU sockets) still consume a GUID, which shows up as a gap.
         */
 
@@ -26,9 +26,12 @@ namespace AmenityExtractor
         {
             var currentGUID = 1;
 
-            // Some objects reserve extra guids for unknown reasons currently, so we need to skip ahead if one of those is found
-            // A good example of this that was previously unknown is the repair_silo object. It has three extra GUIDs assigned after it for terminals: which are for BFR Rearming, Ground vehicle rearming and ground vehicle repair
-            // Adding these objects to the map is currently hardcoded within the PSF-MapGenerator project
+            // Some objects allocate extra GUIDs for sub-terminals while they are constructed; they follow the object's own GUID and are not map objects (client-confirmed on four zones, see the notes on reserved GUID ranges):
+            //  - amp_station, comm_station, comm_station_dsp, cryo_facility, tech_plant (building basetype 1..5): 2 = recharge_terminal_weapon_module, medical_terminal_healing_module
+            //  - pad_landing_frame, pad_landing_tower_frame: 2 = rearm terminal, recharge terminal
+            //  - repair_silo: 3 = rearm terminal, bfr_rearm_terminal, recharge terminal
+            //  - crystals_vehicle_a / crystals_vehicle_b: 1 = crystals_vehicle_recharge_terminal
+            // The counts come from the definitions' has_aggregate_*_terminal properties and the facility basetypes; adding these sub-objects to the map is done in the PSF-MapGenerator project.
             var objectTypesWithMultipleGuids = new Dictionary<string, int>()
             {
                 { "amp_station", 2 }, { "comm_station", 2 }, {"comm_station_dsp", 2}, {"cryo_facility", 2 }, {"tech_plant", 2}, {"pad_landing_frame", 2},
