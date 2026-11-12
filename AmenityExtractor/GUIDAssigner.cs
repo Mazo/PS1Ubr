@@ -59,12 +59,11 @@ namespace AmenityExtractor
             // There is an inconsistency with Verica on Amerish in that the base has zero rotation, so the CC external doors are on almost exactly the same X coordinates, but the game seems to order them the opposite way around (4871.424f = GUID 450, 4871.425f = GUID 451 with the normal assignment rules, reversed on client)
             // The easiest way around this is to just truncate the coords to 2 decimal places, then the ordering will be correct from the Y and Z coords.
             // On further inspection, it would seem FateJH has found another issue requiring even less precision, two of the medical terminals in VS sanctuary need a single decimal place of precision to be ordered correctly.
-            foreach (var obj in mapObjects
-                .Where(x => x.IsChildObject)
-                .OrderBy(x => x.ObjectType)
-                .ThenBy(x => Math.Truncate(x.AbsX * 10) / 10)
-                .ThenBy(x => Math.Truncate(x.AbsY * 10) / 10)
-                .ThenBy(x => Math.Truncate(x.AbsZ * 10) / 10))
+            // Children are sorted the way the client does it: STLport stable_sort over the objects in creation order, using a comparator that
+            // compares names (case-insensitive), then X and Y with a 0.1 tolerance, then Z. See ClientStableSort and ClientObjectLess.
+            var orderedChildren = ClientStableSort.Sort(mapObjects.Where(x => x.IsChildObject).OrderBy(x => x.Id).ToList(), ClientObjectLess);
+
+            foreach (var obj in orderedChildren)
             {
                 obj.GUID = currentGUID;
                 currentGUID++;
@@ -75,6 +74,30 @@ namespace AmenityExtractor
                 obj.ObjectType = obj.ObjectType.Replace("!", "");
                 obj.ObjectName = obj.ObjectName.Replace("!", "");
             }
+        }
+
+        private const float ClientCoordinateTolerance = 0.1f;
+
+        // Comparator from the game client (a < b): _stricmp on the name (A-Z folded to lowercase), then X and Y only compared when they differ by at least 0.1, otherwise Z.
+        private static bool ClientObjectLess(PlanetSideObject a, PlanetSideObject b)
+        {
+            var c = CompareNamesIgnoreCase(a.ObjectType.Replace("!", ""), b.ObjectType.Replace("!", ""));
+            if (c != 0) return c < 0;
+            if (Math.Abs(a.AbsX - b.AbsX) >= ClientCoordinateTolerance) return a.AbsX < b.AbsX;
+            if (Math.Abs(a.AbsY - b.AbsY) >= ClientCoordinateTolerance) return a.AbsY < b.AbsY;
+            return a.AbsZ < b.AbsZ;
+        }
+
+        private static int CompareNamesIgnoreCase(string a, string b)
+        {
+            var length = Math.Min(a.Length, b.Length);
+            for (var i = 0; i < length; i++)
+            {
+                var ca = char.ToLowerInvariant(a[i]);
+                var cb = char.ToLowerInvariant(b[i]);
+                if (ca != cb) return ca < cb ? -1 : 1;
+            }
+            return a.Length.CompareTo(b.Length);
         }
     }
 }
