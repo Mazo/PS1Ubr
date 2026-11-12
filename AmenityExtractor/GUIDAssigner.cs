@@ -41,29 +41,11 @@ namespace AmenityExtractor
             //objectNamesWithMultipleGuids.Add("Hart_Forseral", 48); // TR - 12 repair silos
             //objectNamesWithMultipleGuids.Add("Hart_Hossin", 24); // NC - 6 repair silos
 
-            // First iterate over structures in the correct order
-            foreach (var obj in mapObjects
-                .Where(x => !x.IsChildObject)
-                .OrderBy(x => x.ObjectType)
-                .ThenBy(x => x.AbsX)
-                .ThenBy(x => x.AbsY)
-                .ThenBy(x => x.AbsZ))
-            {
-                obj.GUID = currentGUID;
-                currentGUID++;
-                if (objectTypesWithMultipleGuids.ContainsKey(obj.ObjectType)) currentGUID += objectTypesWithMultipleGuids[obj.ObjectType]; // Skip reserved GUIDS
-                if (objectNamesWithMultipleGuids.ContainsKey(obj.ObjectName)) currentGUID += objectNamesWithMultipleGuids[obj.ObjectName]; // Skip reserved GUIDS
-            }
+            // The client sorts every map object in one vector (STLport stable_sort over the objects in creation order): structures first (objects with a map id), then everything else, each group ordered by
+            // name (case-insensitive), then X and Y with a 0.1 tolerance, then Z. GUIDs are handed out in that order. See ClientStableSort and ClientObjectLess.
+            var orderedObjects = ClientStableSort.Sort(mapObjects.OrderBy(x => x.Id).ToList(), ClientObjectLess);
 
-            // Then do everything else
-            // There is an inconsistency with Verica on Amerish in that the base has zero rotation, so the CC external doors are on almost exactly the same X coordinates, but the game seems to order them the opposite way around (4871.424f = GUID 450, 4871.425f = GUID 451 with the normal assignment rules, reversed on client)
-            // The easiest way around this is to just truncate the coords to 2 decimal places, then the ordering will be correct from the Y and Z coords.
-            // On further inspection, it would seem FateJH has found another issue requiring even less precision, two of the medical terminals in VS sanctuary need a single decimal place of precision to be ordered correctly.
-            // Children are sorted the way the client does it: STLport stable_sort over the objects in creation order, using a comparator that
-            // compares names (case-insensitive), then X and Y with a 0.1 tolerance, then Z. See ClientStableSort and ClientObjectLess.
-            var orderedChildren = ClientStableSort.Sort(mapObjects.Where(x => x.IsChildObject).OrderBy(x => x.Id).ToList(), ClientObjectLess);
-
-            foreach (var obj in orderedChildren)
+            foreach (var obj in orderedObjects)
             {
                 obj.GUID = currentGUID;
                 currentGUID++;
@@ -78,9 +60,10 @@ namespace AmenityExtractor
 
         private const float ClientCoordinateTolerance = 0.1f;
 
-        // Comparator from the game client (a < b): _stricmp on the name (A-Z folded to lowercase), then X and Y only compared when they differ by at least 0.1, otherwise Z.
+        // Comparator from the game client (a < b): objects with a map id (non-children) first, then _stricmp on the name (A-Z folded to lowercase), then X and Y only compared when they differ by at least 0.1, otherwise Z.
         private static bool ClientObjectLess(PlanetSideObject a, PlanetSideObject b)
         {
+            if (a.IsChildObject != b.IsChildObject) return !a.IsChildObject;
             var c = CompareNamesIgnoreCase(a.ObjectType.Replace("!", ""), b.ObjectType.Replace("!", ""));
             if (c != 0) return c < 0;
             if (Math.Abs((float)a.SortX - (float)b.SortX) >= ClientCoordinateTolerance) return (float)a.SortX < (float)b.SortX;
