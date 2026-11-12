@@ -114,6 +114,9 @@ namespace AmenityExtractor
                 // Sanity checking that assigned GUIDs match expected GUID ranges
                 SanityChecker.CheckGuidRanges(identifiableObjects, mapName, mapNumber);
 
+                // Optional check against a GUID dump recorded from the real client (CLIENT_GUID_DUMPS), before unused LLU sockets are removed
+                ClientDumpChecker.Check(identifiableObjects, isCave ? $"ugd{mapNumber}" : $"map{mapNumber}");
+
                 RemoveUnusedLluSockets(identifiableObjects, mapNumber);
 
                 // Export to json file

@@ -4,9 +4,10 @@ using System.Collections.Generic;
 namespace AmenityExtractor
 {
     /// <summary>
-    /// Re-implementation of the STLport stable_sort (temporary buffer path) used by the game client to order map objects.
+    /// Re-implementation of the STLport stable_sort (temporary buffer path) used by the game client to order map objects (client function at 0x008c9a10).
     /// The client's comparator is not a strict weak ordering (near-equal coordinates are treated as ties), so the result depends on the exact
     /// algorithm: insertion sort of chunks of 7, merge passes between the list and a buffer, then a final merge of the two halves.
+    /// See the reverse-engineering notes on the map-object sort comparator; the port was verified against client GUID dumps.
     /// </summary>
     public static class ClientStableSort
     {
