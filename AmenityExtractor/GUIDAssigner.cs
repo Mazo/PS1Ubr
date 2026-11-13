@@ -38,12 +38,7 @@ namespace AmenityExtractor
                 { "pad_landing_tower_frame", 2}, {"repair_silo", 3}, {"crystals_vehicle_a", 1}, {"crystals_vehicle_b", 1}
             };
 
-            var objectNamesWithMultipleGuids = new Dictionary<string, int>();
 
-
-            // Cyssor has a gap between the monolith object (GUID 59 clientside) and the first tech_plant (Wele - GUID 66 clientside) object that is not explained yet (map03 has not been captured from the client).
-            // Until it is, the workaround below skips 6 GUIDs ahead after the monolith.
-            objectNamesWithMultipleGuids.Add("monolith_cyssor", 6);
 
             // Repair silos in sanctuaries are groundcover roots (not part of a building) and are numbered in sort order like any other root; no special skip is needed
             // (confirmed on the VS sanctuary, map13).
@@ -56,7 +51,6 @@ namespace AmenityExtractor
                 obj.GUID = currentGUID;
                 currentGUID++;
                 if (objectTypesWithMultipleGuids.ContainsKey(obj.ObjectType)) currentGUID += objectTypesWithMultipleGuids[obj.ObjectType]; // Skip reserved GUIDS
-                if (objectNamesWithMultipleGuids.ContainsKey(obj.ObjectName)) currentGUID += objectNamesWithMultipleGuids[obj.ObjectName]; // Skip reserved GUIDS
 
                 // ! prefix found in cave groundcover files indicate the object should be classed as an "entity" guid, not a structure guid. Trim it once processed.
                 obj.ObjectType = obj.ObjectType.Replace("!", "");

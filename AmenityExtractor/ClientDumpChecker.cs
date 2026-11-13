@@ -28,6 +28,7 @@ namespace AmenityExtractor
             var used = new HashSet<int>();
             int rows = 0, equal = 0, different = 0, clientOnly = 0;
             var differing = new List<string>();
+            var verbose = Environment.GetEnvironmentVariable("CLIENT_GUID_VERBOSE") == "1";
 
             foreach (var line in File.ReadLines(path).Skip(1))
             {
@@ -52,13 +53,14 @@ namespace AmenityExtractor
                     }
                 }
 
-                if (best == null || bestDistance > PositionTolerance) { clientOnly++; continue; }
+                if (best == null || bestDistance > PositionTolerance) { clientOnly++; if (verbose) Console.WriteLine($"  client-only {guid} {c[2]} {x} {y} {z}" + (best != null ? $" (nearest {bestDistance:F3})" : "")); continue; }
                 used.Add(best.Id);
                 if (best.GUID == guid) equal++;
                 else { different++; if (differing.Count < 5) differing.Add($"{c[2]} client {guid} extractor {best.GUID}"); }
             }
 
             Console.WriteLine($"Client dump check {outputName}: {rows} client rows, {equal} GUIDs equal, {different} different, {clientOnly} client-only (objects the extractor does not export, e.g. removed LLU sockets), {objects.Count - used.Count} extractor-only");
+            if (verbose) foreach (var o in objects.Where(o => !used.Contains(o.Id))) Console.WriteLine($"  extractor-only {o.GUID} {o.ObjectType} {o.SortX:F3} {o.SortY:F3} {o.SortZ:F3}");
             foreach (var d in differing) Console.WriteLine("  " + d);
         }
     }

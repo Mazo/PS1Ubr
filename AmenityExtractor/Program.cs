@@ -13,9 +13,10 @@ using Formatting = Newtonsoft.Json.Formatting;
 
 namespace AmenityExtractor
 {
-    class Program
+    public class Program
     {
         // Path to the mod ready planetside folder that has everything pre-extracted from the pak files.
+        public static string PlanetsideFolder => _planetsideModReadyFolder;
         private static string _planetsideModReadyFolder = "C:\\Planetside (Mod ready)\\Planetside";
 
         private static List<string> _objectsWithGuids = new List<string>(File.ReadAllLines("ObjectsWithGuids.txt"));
@@ -306,6 +307,27 @@ namespace AmenityExtractor
                 var relativeObjectRotationDegrees = MathFunctions.PS1RotationToDegrees((int)line.Yaw);
                 var exactRelativeObjectRotationDegrees = MathFunctions.PS1RotationToExactDegrees((int)line.Yaw);
                 var (exactRelRotX, exactRelRotY) = MathFunctions.RotateXY(line.RelX, line.RelY, MathFunctions.DegreesToRadians(ownerObject.ExactYawDegrees));
+
+                // The client also creates the relative object itself as a root placement (it sorts and gets a GUID like any other root)
+                // when its definition has a type. No map id is known for these.
+                if (ObjectDefinitions.GetProperty(line.ObjectName, "type") != null)
+                {
+                    identifiableObjects.Add(new PlanetSideObject
+                    {
+                        Id = id,
+                        ObjectName = line.ObjectName.ToLower(),
+                        ObjectType = line.ObjectName.ToLower(),
+                        Owner = ownerObject.Id,
+                        AbsX = relativeObjectPos.x,
+                        AbsY = relativeObjectPos.y,
+                        AbsZ = relativeObjectPos.z,
+                        SortX = ownerObject.SortX + exactRelRotX,
+                        SortY = ownerObject.SortY + exactRelRotY,
+                        SortZ = relativeObjectPos.z,
+                        IsChildObject = false
+                    });
+                    id++;
+                }
 
                 // Process any sub-objects in the ubr file for this relative object (e.g. bfr_door within bfr_building ubr)
                 foreach (var meshItem in mesh.PortalSystem.MeshItems)
