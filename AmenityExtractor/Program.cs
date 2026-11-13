@@ -222,6 +222,20 @@ namespace AmenityExtractor
 
             // Get the sub-entities from the UBR file that would have a GUID within this object
             var baseMesh = UBRReader.GetMeshSystem(entry.ObjectType, uberData.Value);
+            if (isTopLevel)
+            {
+                var (bMinX, bMinY, bMaxX, bMaxY) = (float.MaxValue, float.MaxValue, float.MinValue, float.MinValue);
+                foreach (var cx in new[] { baseMesh.BBMin.X, baseMesh.BBMax.X })
+                {
+                    foreach (var cy in new[] { baseMesh.BBMin.Y, baseMesh.BBMax.Y })
+                    {
+                        var (qx, qy) = MathFunctions.RotateXY(cx, cy, exactRotationRadians);
+                        bMinX = Math.Min(bMinX, qx); bMaxX = Math.Max(bMaxX, qx);
+                        bMinY = Math.Min(bMinY, qy); bMaxY = Math.Max(bMaxY, qy);
+                    }
+                }
+                entryObject.BoxMinX = bMinX; entryObject.BoxMinY = bMinY; entryObject.BoxMaxX = bMaxX; entryObject.BoxMaxY = bMaxY;
+            }
             foreach (var meshItem in baseMesh.PortalSystem.MeshItems)
             {
                 // If it's not an entity that would be assigned a GUID we don't care about it and should skip it

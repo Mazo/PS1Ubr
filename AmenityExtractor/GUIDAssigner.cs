@@ -22,6 +22,39 @@ namespace AmenityExtractor
          Objects the client creates but we do not export (unused LLU sockets) still consume a GUID, which shows up as a gap.
         */
 
+        /// <summary>
+        /// The client builds the vector to sort in two passes over its quadtree: first every root placement, then (for each root that has children, in the same walk order)
+        /// the root's children. Root order here is our creation order; children are grouped under their root in creation order.
+        /// </summary>
+        public static List<PlanetSideObject> ClientInputOrder(List<PlanetSideObject> mapObjects)
+        {
+            var byId = mapObjects.ToDictionary(o => o.Id);
+            PlanetSideObject RootOf(PlanetSideObject o)
+            {
+                while (o.IsChildObject && o.Owner.HasValue && byId.TryGetValue(o.Owner.Value, out var p) && p != o) o = p;
+                return o;
+            }
+            var ordered = mapObjects.OrderBy(x => x.Id).ToList();
+            var roots = ordered.Where(o => !o.IsChildObject).ToList();
+
+            // Roots come out of the quadtree walk in first-visit order (insertion order = creation order). Roots without a known box keep creation order at the end.
+            var tree = new ClientQuadtree(0f, 0f, 8192f, 8192f, 6);
+            for (var i = 0; i < roots.Count; i++)
+            {
+                var r = roots[i];
+                if (!r.BoxMinX.HasValue) continue;
+                tree.Add(i, (float)r.SortX + r.BoxMinX.Value, (float)r.SortY + r.BoxMinY, (float)r.SortX + r.BoxMaxX, (float)r.SortY + r.BoxMaxY);
+            }
+            var walked = tree.Walk();
+            var walkedSet = new HashSet<int>(walked);
+            var rootsInWalkOrder = walked.Select(i => roots[i]).Concat(roots.Where((r, i) => !walkedSet.Contains(i))).ToList();
+
+            var result = new List<PlanetSideObject>(rootsInWalkOrder);
+            var rootOrder = rootsInWalkOrder.Select((r, i) => (r.Id, i)).ToDictionary(x => x.Id, x => x.i);
+            result.AddRange(ordered.Where(o => o.IsChildObject).OrderBy(o => rootOrder.TryGetValue(RootOf(o).Id, out var i) ? i : int.MaxValue));
+            return result;
+        }
+
         public static void AssignGUIDs(List<PlanetSideObject> mapObjects)
         {
             var currentGUID = 1;
@@ -44,7 +77,7 @@ namespace AmenityExtractor
             // (confirmed on the VS sanctuary, map13).
 
             // Sort like the client (see the comment at the top of this class), then hand out GUIDs in that order.
-            var orderedObjects = ClientStableSort.Sort(mapObjects.OrderBy(x => x.Id).ToList(), ClientObjectLess);
+            var orderedObjects = ClientStableSort.Sort(ClientInputOrder(mapObjects), ClientObjectLess);
 
             foreach (var obj in orderedObjects)
             {

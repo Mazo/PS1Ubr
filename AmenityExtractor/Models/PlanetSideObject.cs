@@ -18,6 +18,11 @@ namespace AmenityExtractor.Models
         [JsonIgnore] public double SortY { get; set; }
         [JsonIgnore] public double SortZ { get; set; }
         [JsonIgnore] public double ExactYawDegrees { get; set; }
+        // Axis-aligned box (x/y, relative to the position) of the placement's rotated model bounds; roots only. Used to emulate the client's quadtree walk.
+        [JsonIgnore] public float? BoxMinX { get; set; }
+        [JsonIgnore] public float BoxMinY { get; set; }
+        [JsonIgnore] public float BoxMaxX { get; set; }
+        [JsonIgnore] public float BoxMaxY { get; set; }
 
         [JsonProperty("Yaw")]
         public double YawDegrees { get; set; }
