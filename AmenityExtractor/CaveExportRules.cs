@@ -27,9 +27,10 @@ namespace AmenityExtractor
                 crystal.IsChildObject = false;
             }
 
-            foreach (var entry in CaveOwnerOverrides.VanuEquipmentTermOwners.Where(e => e.Map == map))
+            foreach (var entry in CaveOwnerOverrides.VanuEquipmentTermOwners.Concat(CaveOwnerOverrides.VanuEquipmentTermAdditions).Where(e => e.Map == map))
             {
-                var terminal = objects.FirstOrDefault(o => o.ObjectType == "vanu_equipment_term" && o.IsChildObject && o.Owner == null && At(o, entry.X, entry.Y, entry.Z));
+                // Additions are free-standing placements that become children of the owner (a free-standing object must not have an owner)
+                var terminal = objects.FirstOrDefault(o => o.ObjectType == "vanu_equipment_term" && o.Owner == null && o.IsChildObject == !entry.Addition && At(o, entry.X, entry.Y, entry.Z));
                 var owner = objects.FirstOrDefault(o => o.ObjectType == entry.OwnerType && At(o, entry.OwnerX, entry.OwnerY, entry.OwnerZ));
                 if (terminal == null || owner == null)
                 {
@@ -38,6 +39,7 @@ namespace AmenityExtractor
                 }
 
                 terminal.Owner = owner.Id;
+                terminal.IsChildObject = true;
             }
         }
 

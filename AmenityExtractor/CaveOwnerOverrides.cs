@@ -14,9 +14,11 @@ namespace AmenityExtractor
         public struct Entry
         {
             public string Map; public float X, Y, Z; public string OwnerType; public float OwnerX, OwnerY, OwnerZ;
-            public Entry(string map, float x, float y, float z, string ownerType, float ox, float oy, float oz)
+            /// <summary>True for a free-standing placement that is given an owner (it becomes a child of that building); false for a child that only lacks its owner.</summary>
+            public bool Addition;
+            public Entry(string map, float x, float y, float z, string ownerType, float ox, float oy, float oz, bool addition = false)
             {
-                Map = map; X = x; Y = y; Z = z; OwnerType = ownerType; OwnerX = ox; OwnerY = oy; OwnerZ = oz;
+                Map = map; X = x; Y = y; Z = z; OwnerType = ownerType; OwnerX = ox; OwnerY = oy; OwnerZ = oz; Addition = addition;
             }
         }
 
@@ -196,6 +198,18 @@ namespace AmenityExtractor
             new Entry("ugd06", 1263.080f, 997.750f, 100.830f, "vanu_core", 1028.800f, 1012.780f, 165.780f),
             new Entry("ugd06", 1263.420f, 1014.840f, 100.830f, "vanu_core", 1028.800f, 1012.780f, 165.780f),
             new Entry("ugd06", 1266.790f, 810.470f, 85.060f, "redoubt", 1253.480f, 805.800f, 85.100f),
+        };
+
+        /// <summary>
+        /// Additions that are not part of the hand edits: two plain (non-"!") ground-cover placements in ugd03 that the server would not create without an owner.
+        /// The nearest-building and redoubt rules were ambiguous for them, so the owner was chosen by project decision: the cave's vanu_core, like the other
+        /// terminals that do not stand in a redoubt. They are exported like the other owned terminals (child of the owner).
+        /// </summary>
+        public static readonly List<Entry> VanuEquipmentTermAdditions = new List<Entry>
+        {
+            // Unreachable in-game (it sits inside the floor); it is given an owner anyway so that the server creates it.
+            new Entry("ugd03", 780.02f, 670.64f, 112.67f, "vanu_core", 1026.950f, 1013.730f, 97.730f, addition: true),
+            new Entry("ugd03", 1318.38f, 909.65f, 59.30f, "vanu_core", 1026.950f, 1013.730f, 97.730f, addition: true),
         };
     }
 }
