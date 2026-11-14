@@ -334,7 +334,7 @@ namespace AmenityExtractor
                         Id = id,
                         ObjectName = line.ObjectName.ToLower(),
                         ObjectType = line.ObjectName.ToLower(),
-                        Owner = ownerObject.Id,
+                        // A root placement: no owner (the server requires a free-standing object to have none)
                         AbsX = relativeObjectPos.x,
                         AbsY = relativeObjectPos.y,
                         AbsZ = relativeObjectPos.z,
