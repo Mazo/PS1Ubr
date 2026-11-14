@@ -135,7 +135,7 @@ namespace AmenityExtractor
                 RemoveUnusedLluSockets(identifiableObjects, mapNumber);
 
                 // Cave ground-cover objects need an explicit owner / child decision for the server (see CaveExportRules)
-                if (isCave) CaveExportRules.Apply(identifiableObjects);
+                if (isCave) CaveExportRules.Apply(identifiableObjects, $"ugd{mapNumber}");
 
                 // Export to json file
                 var json = ZonemapJson.Serialize(identifiableObjects.OrderBy(x => x.GUID));

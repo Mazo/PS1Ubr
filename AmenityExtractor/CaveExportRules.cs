@@ -11,17 +11,15 @@ namespace AmenityExtractor
     ///
     /// The cave ground-cover files list some objects with a "!" prefix ("part of a building") without saying which building. The server loads building
     /// amenities through Owner and every other object as free-standing, so these objects need an explicit decision. The client's own link for these objects
-    /// is not captured for caves, so the rules below are not client-derived (inferred, not confirmed): they reproduce the committed zonemaps, in which
-    /// the owners were chosen by hand (vanu_equipment_term: 174 objects, crystals: 317 objects).
-    ///  - crystals_* objects are free-standing: no owner, not a child.
-    ///  - a vanu_equipment_term that no building model contains is owned by the redoubt it stands in (within RedoubtRadius, observed 12 to 16 units, nearest
-    ///    other redoubt at 64 or more) and otherwise by the cave's vanu_core.
+    /// is not captured for caves, so nothing below is client-derived (inferred, not confirmed):
+    ///  - crystals_* objects are free-standing (no owner, not a child). Server-driven: the server creates them without a building, and a non-child must not have an owner.
+    ///  - vanu_equipment_term objects that no building model contains get their owner from CaveOwnerOverrides (a temporary table).
     /// </summary>
     public static class CaveExportRules
     {
-        private const double RedoubtRadius = 20.0;
+        public const float PositionTolerance = 0.01f;
 
-        public static void Apply(List<PlanetSideObject> objects)
+        public static void Apply(List<PlanetSideObject> objects, string map)
         {
             foreach (var crystal in objects.Where(o => o.ObjectType.StartsWith("crystals_", StringComparison.Ordinal)))
             {
@@ -29,34 +27,23 @@ namespace AmenityExtractor
                 crystal.IsChildObject = false;
             }
 
-            var redoubts = objects.Where(o => o.ObjectType == "redoubt").ToList();
-            var cores = objects.Where(o => o.ObjectType == "vanu_core").ToList();
-
-            foreach (var terminal in objects.Where(o => o.ObjectType == "vanu_equipment_term" && o.IsChildObject && o.Owner == null))
+            foreach (var entry in CaveOwnerOverrides.VanuEquipmentTermOwners.Where(e => e.Map == map))
             {
-                var redoubt = Nearest(terminal, redoubts);
-                if (redoubt != null && Distance(terminal, redoubt) <= RedoubtRadius)
+                var terminal = objects.FirstOrDefault(o => o.ObjectType == "vanu_equipment_term" && o.IsChildObject && o.Owner == null && At(o, entry.X, entry.Y, entry.Z));
+                var owner = objects.FirstOrDefault(o => o.ObjectType == entry.OwnerType && At(o, entry.OwnerX, entry.OwnerY, entry.OwnerZ));
+                if (terminal == null || owner == null)
                 {
-                    terminal.Owner = redoubt.Id;
+                    Console.WriteLine($"Cave owner override for {map} at {entry.X}, {entry.Y}, {entry.Z} did not match ({(terminal == null ? "terminal" : "owner")} missing)");
                     continue;
                 }
 
-                var core = Nearest(terminal, cores);
-                if (core != null) terminal.Owner = core.Id;
+                terminal.Owner = owner.Id;
             }
         }
 
-        private static PlanetSideObject Nearest(PlanetSideObject from, List<PlanetSideObject> candidates)
+        private static bool At(PlanetSideObject o, float x, float y, float z)
         {
-            return candidates.OrderBy(c => Distance(from, c)).FirstOrDefault();
-        }
-
-        private static double Distance(PlanetSideObject a, PlanetSideObject b)
-        {
-            var dx = a.AbsX - b.AbsX;
-            var dy = a.AbsY - b.AbsY;
-            var dz = a.AbsZ - b.AbsZ;
-            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            return Math.Abs(o.AbsX - x) <= PositionTolerance && Math.Abs(o.AbsY - y) <= PositionTolerance && Math.Abs(o.AbsZ - z) <= PositionTolerance;
         }
     }
 }
