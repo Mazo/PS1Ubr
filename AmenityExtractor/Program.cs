@@ -135,7 +135,7 @@ namespace AmenityExtractor
                 RemoveUnusedLluSockets(identifiableObjects, mapNumber);
 
                 // Export to json file
-                var json = JsonConvert.SerializeObject(identifiableObjects.OrderBy(x => x.GUID), Formatting.Indented);
+                var json = ZonemapJson.Serialize(identifiableObjects.OrderBy(x => x.GUID));
 
                 var filename = !isCave ? $"map{mapNumber}.json" : $"ugd{mapNumber}.json";
                 File.WriteAllText(filename, json);
@@ -145,7 +145,7 @@ namespace AmenityExtractor
                     // Read zipline data, reformat and export as json
                     var zplData = ZplReader.ReadZplFile(_planetsideModReadyFolder, mapNumber);
 
-                    File.WriteAllText($"zpl_ugd{mapNumber}.json", JsonConvert.SerializeObject(zplData, Formatting.Indented));
+                    File.WriteAllText($"zpl_ugd{mapNumber}.json", ZonemapJson.Serialize(zplData));
                 }
             }
 
