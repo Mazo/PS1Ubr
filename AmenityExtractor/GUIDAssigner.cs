@@ -64,7 +64,7 @@ namespace AmenityExtractor
             //  - pad_landing_frame, pad_landing_tower_frame: 2 = rearm terminal, recharge terminal
             //  - repair_silo: 3 = rearm terminal, bfr_rearm_terminal, recharge terminal
             //  - crystals_vehicle_a / crystals_vehicle_b: 1 = crystals_vehicle_recharge_terminal
-            // The counts come from the definitions' has_aggregate_*_terminal properties and the facility basetypes; adding these sub-objects to the map is done in the PSF-MapGenerator project.
+            // The counts come from the definitions' has_aggregate_*_terminal properties and the facility basetypes; the server creates these sub-objects itself when it loads the zonemap (PSF-LoginServer Zones.scala).
             var objectTypesWithMultipleGuids = new Dictionary<string, int>()
             {
                 { "amp_station", 2 }, { "comm_station", 2 }, {"comm_station_dsp", 2}, {"cryo_facility", 2 }, {"tech_plant", 2}, {"pad_landing_frame", 2},
