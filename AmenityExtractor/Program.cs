@@ -327,6 +327,11 @@ namespace AmenityExtractor
 
                 // The client also creates the relative object itself as a root placement (it sorts and gets a GUID like any other root)
                 // when its definition has a type. No map id is known for these.
+                // Note: such a root sits at the same position as the mesh child of the same model (for the map03 tech plant, each pad_landing root is at the exact
+                // position of a pad_landing_frame child, which has its own GUID and owner). The two are separate client objects with separate GUIDs, so these are
+                // not duplicates by mistake. The server has no use for the roots (it ignores the type) but they must be exported so the GUID numbering stays aligned.
+                // The same model also has plain pad_landing mesh children about 1.8 units away (1.6 horizontally, 0.87 higher). The source rows carry a rotation (14-bit),
+                // but the root's Yaw is not set here, so it is exported as 0 (an omission; it affects neither the GUID order nor the server, which ignores these roots).
                 if (ObjectDefinitions.GetProperty(line.ObjectName, "type") != null)
                 {
                     identifiableObjects.Add(new PlanetSideObject
