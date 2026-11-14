@@ -330,8 +330,7 @@ namespace AmenityExtractor
                 // Note: such a root sits at the same position as the mesh child of the same model (for the map03 tech plant, each pad_landing root is at the exact
                 // position of a pad_landing_frame child, which has its own GUID and owner). The two are separate client objects with separate GUIDs, so these are
                 // not duplicates by mistake. The server has no use for the roots (it ignores the type) but they must be exported so the GUID numbering stays aligned.
-                // The same model also has plain pad_landing mesh children about 1.8 units away (1.6 horizontally, 0.87 higher). The source rows carry a rotation (14-bit),
-                // but the root's Yaw is not set here, so it is exported as 0 (an omission; it affects neither the GUID order nor the server, which ignores these roots).
+                // The same model also has plain pad_landing mesh children about 1.8 units away (1.6 horizontally, 0.87 higher). The root's Yaw is the owner's rotation plus the row's.
                 if (ObjectDefinitions.GetProperty(line.ObjectName, "type") != null)
                 {
                     identifiableObjects.Add(new PlanetSideObject
@@ -346,6 +345,7 @@ namespace AmenityExtractor
                         SortX = ownerObject.SortX + exactRelRotX,
                         SortY = ownerObject.SortY + exactRelRotY,
                         SortZ = relativeObjectPos.z,
+                        YawDegrees = MathFunctions.NormalizeDegrees((int)(ownerObject.YawDegrees + relativeObjectRotationDegrees)),
                         IsChildObject = false
                     });
                     id++;
@@ -357,6 +357,11 @@ namespace AmenityExtractor
                     if (!_objectsWithGuids.Contains(meshItem.AssetName)) continue;
 
                     var subObjectRotationDegrees = MathFunctions.TransformToRotationDegrees(meshItem.Transform);
+
+                    // Orientation the same way as for the mesh children of a placement (see ProcessObject), with the placement's rotation being the owner's
+                    // rotation plus the row's rotation (the same composition that positions the children, which matches the client).
+                    var relativeParentRotationClockwise = 360 - (ownerObject.YawDegrees + relativeObjectRotationDegrees);
+                    var subObjectYaw = relativeParentRotationClockwise + (360 - (180 - subObjectRotationDegrees));
 
                     var (exactSubRotX, exactSubRotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13], MathFunctions.DegreesToRadians(ownerObject.ExactYawDegrees + exactRelativeObjectRotationDegrees));
                     var (subObjectRotX, subObjectRotY) = MathFunctions.RotateXY(meshItem.Transform[12], meshItem.Transform[13], MathFunctions.DegreesToRadians(ownerObject.YawDegrees + relativeObjectRotationDegrees));
@@ -372,6 +377,7 @@ namespace AmenityExtractor
                         SortX = ownerObject.SortX + exactRelRotX + exactSubRotX,
                         SortY = ownerObject.SortY + exactRelRotY + exactSubRotY,
                         SortZ = relativeObjectPos.z + meshItem.Transform[14],
+                        YawDegrees = MathFunctions.NormalizeDegrees((int)subObjectYaw),
                         IsChildObject = true
                     });
                     id++;
