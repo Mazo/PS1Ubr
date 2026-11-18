@@ -18,7 +18,7 @@ namespace AmenityExtractor
             _parents = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             _props = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             var path = Path.Combine(planetsideFolder, "startup.pak-out", "game_objects.adb.lst");
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path)) throw new FileNotFoundException($"Object definitions not found. Expected {path} (the extracted startup.pak under the Planetside folder: {planetsideFolder}).", path);
             foreach (var line in File.ReadLines(path))
             {
                 var p = line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
@@ -29,6 +29,9 @@ namespace AmenityExtractor
                     d[p[2]] = p[3];
                 }
             }
+
+            if (_props.Count == 0) throw new InvalidDataException($"No object definitions could be read from {path}.");
+            Console.WriteLine($"Loaded {_props.Count} object definitions with properties and {_parents.Count} parent links from {path}");
         }
 
         public static string GetProperty(string objectName, string property)
