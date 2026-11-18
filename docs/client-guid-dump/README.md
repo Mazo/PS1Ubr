@@ -26,9 +26,11 @@ python3 guid_dump_to_csv.py <debugger log> <output folder>
 ```
 writes one CSV per zone (`map04.csv`, `ugd04.csv`, ... columns `seq,guid,name,x,y,z,map_id,id2,obj_guid_field`; a repeated zone gets a `_2` suffix) and `<zone>_links.csv` when link lines are present.
 
-Run the extractor with `CLIENT_GUID_DUMPS=<that folder>`: after assigning GUIDs it matches each client row to an extractor object by name and position (tolerance 0.01) and prints how many GUIDs are equal or different. Add `CLIENT_GUID_VERBOSE=1` to list the unmatched rows.
+Run the extractor with `CLIENT_GUID_DUMPS=<that folder>`: after assigning GUIDs it matches each client row to an extractor object by name and position (tolerance 0.01; the height only breaks ties between objects at the same x/y) and prints how many GUIDs are equal or different. A client row whose name is not the type of any extractor object (the dump prints garbage for some names) is matched by position only, and its GUID is still compared.
+
+The check is **strict by default**: if any GUID differs, any client row is left unmatched, or any extractor object is missing from the dump, the differences are printed to stderr and the run ends with exit code 1 before the zonemap of that map is written. Set `CLIENT_GUID_STRICT=0` to only print them and carry on. `CLIENT_GUID_VERBOSE=1` lists every unmatched row instead of the first 20 of each kind. Maps without a dump file are skipped, and nothing happens when `CLIENT_GUID_DUMPS` is not set.
 
 ## Caveats
-- The `mb_pad_creation` objects print a garbage name in the dump; their GUIDs and positions are right, so they show up as unmatched rows in the comparison.
+- The `mb_pad_creation` objects print a garbage name in the dump; their GUIDs and positions are right, so they are matched by position and the output notes how many rows were.
 - Capturing slows zone loads a little; the breakpoints are silent but still run for every object.
 - Floats are logged as hex and converted by the script; positions in the CSV are rounded to four decimals.
