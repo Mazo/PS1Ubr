@@ -27,19 +27,29 @@ namespace AmenityExtractor
                 crystal.IsChildObject = false;
             }
 
-            foreach (var entry in CaveOwnerOverrides.VanuEquipmentTermOwners.Concat(CaveOwnerOverrides.VanuEquipmentTermAdditions).Where(e => e.Map == map))
+            var entries = CaveOwnerOverrides.VanuEquipmentTermOwners.Concat(CaveOwnerOverrides.VanuEquipmentTermAdditions).Where(e => e.Map == map).ToList();
+            var unmatched = new List<string>();
+            var matched = 0;
+            foreach (var entry in entries)
             {
                 // Additions are free-standing placements that become children of the owner (a free-standing object must not have an owner)
                 var terminal = objects.FirstOrDefault(o => o.ObjectType == "vanu_equipment_term" && o.Owner == null && o.IsChildObject == !entry.Addition && At(o, entry.X, entry.Y, entry.Z));
                 var owner = objects.FirstOrDefault(o => o.ObjectType == entry.OwnerType && At(o, entry.OwnerX, entry.OwnerY, entry.OwnerZ));
                 if (terminal == null || owner == null)
                 {
-                    Console.WriteLine($"Cave owner override for {map} at {entry.X}, {entry.Y}, {entry.Z} did not match ({(terminal == null ? "terminal" : "owner")} missing)");
+                    unmatched.Add($"{map} terminal at {entry.X}, {entry.Y}, {entry.Z}: {(terminal == null ? "terminal" : $"owner {entry.OwnerType} at {entry.OwnerX}, {entry.OwnerY}, {entry.OwnerZ}")} not found");
                     continue;
                 }
 
                 terminal.Owner = owner.Id;
                 terminal.IsChildObject = true;
+                matched++;
+            }
+
+            // The server only creates these terminals when they have an owner, so a miss must not pass silently
+            if (unmatched.Count > 0 || matched != entries.Count)
+            {
+                throw new InvalidOperationException($"{unmatched.Count} of {entries.Count} cave owner overrides for {map} did not match an object (matched {matched}):{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", unmatched));
             }
         }
 
