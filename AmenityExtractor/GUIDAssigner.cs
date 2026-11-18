@@ -8,7 +8,7 @@ namespace AmenityExtractor
     public static class GUIDAssigner
     {
         /*
-         GUIDs are assigned the way the game client does it (verified against debugger dumps of the client for map04, map05, map13 and ugd04: every object gets the same GUID):
+         GUIDs are assigned the way the game client does it (verified against debugger dumps of the client for all 23 generated zones - surface maps, battle islands and caves - with 0 GUID differences):
 
          1. All map objects go into ONE list in creation order (our Id order). The client then sorts that list with an STLport stable_sort (see ClientStableSort).
          2. The comparator (ClientObjectLess) puts objects that have a map id (structures and groundcover roots, i.e. !IsChildObject) before everything else, then compares the type name
